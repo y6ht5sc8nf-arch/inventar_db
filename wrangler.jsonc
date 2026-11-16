@@ -5,15 +5,14 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  // Vorschau-Adressen abschalten: Access schützt nur die Hauptadresse.
+  "preview_urls": false,
 
-  // Oberfläche und API laufen auf derselben Adresse: statische Dateien aus ./public,
-  // alles unter /api/* geht an den Worker. Eine Access-Anwendung schützt beides.
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
-  },
+  // Oberfläche und API laufen auf derselben Adresse. Die Dateien aus ./public werden
+  // beim Bauen in den Worker gepackt (scripts/bundle-public.mjs) und von ihm ausgeliefert.
+  // Eine Access-Anwendung schützt beides.
+  "build": { "command": "node scripts/bundle-public.mjs" },
 
   "d1_databases": [
     {
@@ -33,9 +32,9 @@
 
   "vars": {
     // Team-Domain von Cloudflare Zero Trust, z. B. "meinteam.cloudflareaccess.com"
-    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_TEAM_DOMAIN": "quiet-tooth-3c66.cloudflareaccess.com",
     // "Application Audience (AUD) Tag" der Access-Anwendung
-    "ACCESS_AUD": ""
+    "ACCESS_AUD": "3a61adfdf0bfa9e5aa18fb9866b73f675fe566074724a4b711152f78b839e6dd"
   }
 
   // Secrets (nur per `wrangler secret put`, nie hier eintragen):

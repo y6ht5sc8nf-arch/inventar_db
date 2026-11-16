@@ -8,8 +8,8 @@
     "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply inventar --local",
     "db:migrate:remote": "wrangler d1 migrations apply inventar --remote",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "node scripts/bundle-public.mjs && vitest run",
+    "typecheck": "node scripts/bundle-public.mjs && tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0",

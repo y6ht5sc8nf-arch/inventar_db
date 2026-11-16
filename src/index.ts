@@ -1,5 +1,6 @@
 import { AccessError, verifyAccess, type AccessUser } from "./access";
 import type { Env } from "./env";
+import { serveStatic, SECURITY_HEADERS } from "./static";
 
 export function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -7,6 +8,7 @@ export function json(data: unknown, status = 200): Response {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
+      ...SECURITY_HEADERS,
     },
   });
 }
@@ -40,7 +42,7 @@ export default {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) {
-      return env.ASSETS.fetch(request);
+      return serveStatic(request);
     }
 
     let user: AccessUser;

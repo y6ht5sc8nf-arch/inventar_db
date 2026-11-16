@@ -10,14 +10,16 @@ Die Auswertung macht Claude über die Anthropic-API, aufgerufen nur im Worker.
 
 ```
 public/          Oberfläche (installierbare Web-App, Service Worker)
+scripts/         bundle-public.mjs packt ./public beim Bauen in den Worker
 src/index.ts     Worker: /api/*, Cron für Batch-Abholung
+src/static.ts    Auslieferung der Oberfläche mit Sicherheits-Headern
 src/access.ts    Prüfung des Access-JWT und der erlaubten Adressen
 migrations/      D1-Schema als Migrationen
 test/            Tests (vitest)
 ```
 
-Oberfläche und API liegen auf **derselben Adresse** (Worker mit statischen Dateien statt eines
-getrennten Pages-Projekts). So schützt eine einzige Access-Anwendung beides, es gibt keine
+Oberfläche und API liegen auf **derselben Adresse**: Der Worker liefert die Dateien aus `public/`
+selbst aus (statt eines getrennten Pages-Projekts). So schützt eine einzige Access-Anwendung beides, es gibt keine
 CORS-Fragen, und der Cron-Trigger für die Batch-Auswertung läuft im selben Worker.
 
 ## Lokal entwickeln
@@ -32,7 +34,16 @@ npm test
 
 `DEV_ACCESS_EMAIL` in `.dev.vars` ersetzt die Anmeldung, wirkt aber nur bei Aufruf über `localhost`.
 
-## Einrichtung bei Cloudflare (einmalig)
+## Aktueller Stand der Einrichtung
+
+- Adresse: https://nachlass-inventar.c2ws85ff78.workers.dev (Access-Anwendung „Nachlass-Inventar“,
+  Anmeldung per Einmalcode, Sitzung 7 Tage)
+- D1 `inventar` und R2 `nachlass-fotos` (Westeuropa, ohne öffentliche URL)
+- Secret `ALLOWED_EMAILS` gesetzt; `ANTHROPIC_API_KEY` trägt der Nutzer im Dashboard ein
+- Bereitstellen: `npm run deploy` (eine weitere Adresse: in der Access-Richtlinie **und** in
+  `ALLOWED_EMAILS` ergänzen)
+
+## Einrichtung bei Cloudflare (einmalig, für eine neue Installation)
 
 1. Datenbank und Bucket anlegen:
    ```bash
