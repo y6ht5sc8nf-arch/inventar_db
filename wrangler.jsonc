@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "nachlass-inventar",
+  "account_id": "6ead2a9eb4a0bb5796697ac97882fe07",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -18,8 +19,7 @@
     {
       "binding": "DB",
       "database_name": "inventar",
-      // Wird nach `wrangler d1 create inventar` eingetragen.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "f54ec218-a754-45fa-b8aa-b4a3e3a98448",
       "migrations_dir": "migrations"
     }
   ],
