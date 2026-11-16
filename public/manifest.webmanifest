@@ -1,0 +1,10 @@
+{
+  "name": "Nachlass-Inventar",
+  "short_name": "Inventar",
+  "lang": "de",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f4ef",
+  "theme_color": "#2d3a33",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

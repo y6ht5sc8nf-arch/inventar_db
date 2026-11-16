@@ -1,0 +1,2 @@
+# Kopie als .dev.vars anlegen (wird nicht eingecheckt). Nur für `wrangler dev`.
+DEV_ACCESS_EMAIL=test@example.org
