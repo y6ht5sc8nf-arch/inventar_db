@@ -119,6 +119,7 @@ CREATE TABLE settings (
 
 INSERT INTO settings (key, value) VALUES
   ('default_model',     'claude-opus-5-5'),
-  ('quick_model',       'claude-opus-5-5'),
+  ('quick_model',       'claude-haiku-5-5'),   -- Schnellerfassung (Entscheidung Nutzer)
   ('silver_price_eur_g', NULL),
-  ('budget_usd',        NULL);
+  ('budget_usd',        '50'),                 -- Warnschwelle Gesamtkosten
+  ('labels_enabled',    '0');                  -- keine QR-Etiketten (Entscheidung Nutzer)
