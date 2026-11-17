@@ -31,7 +31,9 @@ export function serveStatic(request: Request): Response {
   }
   let path = new URL(request.url).pathname;
   if (path === "/") path = "/index.html";
-  const file = PUBLIC_FILES[path] ?? PUBLIC_FILES["/index.html"];
+  // Unbekannte Seitenpfade → index.html; unbekannte Dateien (mit Endung) → 404.
+  const file = PUBLIC_FILES[path] ?? (/\.[a-z0-9]+$/i.test(path) ? undefined : PUBLIC_FILES["/index.html"]);
+  if (!file) return new Response("Nicht gefunden", { status: 404, headers: SECURITY_HEADERS });
 
   const headers = new Headers(SECURITY_HEADERS);
   headers.set("content-type", file.type);
