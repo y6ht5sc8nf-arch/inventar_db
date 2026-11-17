@@ -134,3 +134,8 @@ body.vollbild main { padding: 0; max-width: none; }
 .review img { max-width: 80%; max-height: 45vh; border-radius: 8px; }
 .review .muted, .cam-fallback .muted { color: #bbb; }
 .name-line .grow { white-space: nowrap; }
+
+.card.bib dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: .9rem; }
+.card.bib dt { color: var(--muted); }
+.card.bib dd { margin: 0; }
+.card.bib p { font-size: .8rem; margin: 8px 0 0; }

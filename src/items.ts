@@ -1,6 +1,7 @@
 import type { Env } from "./env";
 import type { AccessUser } from "./access";
 import { HttpError, int, json, oneOf, optUuid, readJson, text, uuid } from "./http";
+import { enrichItem, normalizeIsbn } from "./isbn";
 
 export const CATEGORIES = [
   "buch", "porzellan", "glas", "silber", "moebel", "bild", "schmuck", "papiere", "sonstiges",
@@ -18,15 +19,22 @@ const SLOT = /^[a-z0-9_]{1,32}$/;
  * Die Inventarnummer vergibt die Datenbank in einer einzigen Anweisung – zwei Handys
  * können also nie dieselbe Nummer bekommen (zusätzlich UNIQUE auf inv_no).
  */
-export async function createItem(req: Request, env: Env, user: AccessUser): Promise<Response> {
+export async function createItem(req: Request, env: Env, user: AccessUser, ctx?: ExecutionContext): Promise<Response> {
   const b = await readJson(req);
   const id = uuid(b.id);
   const kind = oneOf(b.kind, "Art", KINDS, "einzeln");
   const category = b.category ? oneOf(b.category, "Kategorie", CATEGORIES) : null;
   const mode = kind === "vermerk" ? "keine" : oneOf(b.analysis_mode, "Auswertung", ANALYSIS_MODES, "nacht");
   const status = mode === "keine" ? "erfasst" : "wartet_auf_auswertung";
-  const meta = b.meta && typeof b.meta === "object" && !Array.isArray(b.meta) ? JSON.stringify(b.meta) : null;
-  if (meta && meta.length > 4000) throw new HttpError(400, "Zusatzangaben zu lang");
+  const metaObj = b.meta && typeof b.meta === "object" && !Array.isArray(b.meta) ? { ...(b.meta as Record<string, unknown>) } : null;
+  // ISBN einheitlich als ISBN-13 speichern; ungültige verwerfen. Katalogdaten ergänzt nur der Server.
+  if (metaObj) {
+    const isbn = typeof metaObj.isbn === "string" ? normalizeIsbn(metaObj.isbn) : null;
+    if (isbn) metaObj.isbn = isbn; else delete metaObj.isbn;
+    delete metaObj.bib;
+  }
+  const meta = metaObj ? JSON.stringify(metaObj) : null;
+  if (meta && meta.length > 20000) throw new HttpError(400, "Zusatzangaben zu lang");
   const createdAt = typeof b.created_at === "string" && !isNaN(Date.parse(b.created_at))
     ? new Date(b.created_at).toISOString()
     : new Date().toISOString();
@@ -70,6 +78,8 @@ export async function createItem(req: Request, env: Env, user: AccessUser): Prom
       throw e;
     }
   }
+  // Buch mit ISBN, aber ohne Katalogdaten (z. B. offline erfasst): im Hintergrund ergänzen.
+  if (metaObj?.isbn) ctx?.waitUntil(enrichItem(env, id).catch((e) => console.error("ISBN", e)));
   const row = await env.DB.prepare(`SELECT id, inv_no, status FROM items WHERE id = ?`).bind(id).first();
   return json(row, 201);
 }

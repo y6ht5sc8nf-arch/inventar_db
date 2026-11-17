@@ -133,6 +133,48 @@ function locationCard(back = "") {
   );
 }
 
+// ---------- Buchdaten zur ISBN ----------
+
+const bibCache = new Map();
+/** Katalogdaten (DNB, Open Library) über den Server; null = nicht gefunden, undefined = gerade nicht erreichbar. */
+async function lookupBib(isbn) {
+  if (bibCache.has(isbn)) return bibCache.get(isbn);
+  try {
+    const { bib } = await api("GET", `/api/isbn/${encodeURIComponent(isbn)}`);
+    bibCache.set(isbn, bib ?? null);
+    return bib ?? null;
+  } catch {
+    return undefined;
+  }
+}
+
+function bibShort(bib) {
+  const a = bib.authors?.[0];
+  const name = a ? (a.includes(",") ? a.split(",")[0] : a.split(" ").at(-1)) : null;
+  return name ? `${name}: ${bib.title}` : bib.title;
+}
+
+function bibCard(bib) {
+  if (!bib) return null;
+  const rows = [
+    ["Titel", bib.title],
+    ["Autor", bib.authors?.join("; ")],
+    ["Verlag", [bib.place, bib.publisher].filter(Boolean).join(": ")],
+    ["Jahr", bib.year],
+    ["Auflage", bib.edition],
+    ["Umfang", bib.pages],
+    ["Reihe", bib.series],
+    ["Sprache", bib.language],
+  ].filter(([, v]) => v);
+  return h("div", { class: "card bib" },
+    h("dl", null, rows.map(([k, v]) => [h("dt", null, k), h("dd", null, v)])),
+    bib.editions_total > 1
+      ? h("p", { class: "muted" }, `Unter dieser ISBN gibt es ${bib.editions_total} Ausgaben (Nachdrucke). `,
+          "Welche vorliegt, klärt die Auswertung anhand des Impressums.")
+      : null,
+    h("p", { class: "muted" }, "Quelle: ", bib.source === "dnb" ? "Deutsche Nationalbibliothek" : "Open Library"));
+}
+
 // ---------- Aufnahme-Sitzung ----------
 
 let session = null; // { itemId, mode, photos: [{photoId, slot, full, thumb, width, height, url}], isbn }
@@ -360,7 +402,12 @@ async function viewCapture(main, [mode]) {
       src: p.url, alt: slots.find((x) => x.id === p.slot)?.label ?? p.slot,
       onclick: () => { current = p.slot; render(); },
     })));
-    if (isbnChip && s.isbn) { isbnChip.textContent = "ISBN " + formatIsbn(s.isbn) + " ✓"; isbnChip.classList.add("ok"); }
+    if (isbnChip && s.isbn) {
+      const info = s.bib ? bibShort(s.bib) + (s.bib.year ? ` (${[s.bib.publisher, s.bib.year].filter(Boolean).join(", ")})` : "")
+        : s.bib === null ? "nicht im Katalog gefunden" : s.bibLoading ? "suche Buchdaten …" : "Buchdaten folgen beim Hochladen";
+      isbnChip.textContent = `ISBN ${formatIsbn(s.isbn)} ✓ · ${info}`;
+      isbnChip.classList.add("ok");
+    }
   }
 
   function accept(shot) {
@@ -423,7 +470,18 @@ async function viewCapture(main, [mode]) {
       video.hidden = false;
       if (mode === "buch") {
         stopScan = scanIsbn(video, (code) => {
-          if (s.isbn !== code) { s.isbn = code; navigator.vibrate?.([40, 40, 40]); render(); }
+          if (s.isbn === code) return;
+          s.isbn = code;
+          s.bib = undefined;
+          s.bibLoading = true;
+          navigator.vibrate?.([40, 40, 40]);
+          render();
+          lookupBib(code).then((bib) => {
+            if (s.isbn !== code) return;
+            s.bib = bib;
+            s.bibLoading = false;
+            if (active) render();
+          });
         });
       }
     } catch (e) {
@@ -459,6 +517,12 @@ async function viewDetails(main) {
   const o = ort.get();
 
   const title = h("input", { type: "text", maxlength: 300, placeholder: (quick ? "z. B. Besteckschublade" : cat.hint) });
+  let autoTitle = "";
+  const bibBox = h("div");
+  function showBib(bib) {
+    fill(bibBox, bibCard(bib));
+    if (bib && (!title.value || title.value === autoTitle)) title.value = autoTitle = bibShort(bib);
+  }
   const isbn = s.mode === "buch" ? h("input", { type: "text", inputmode: "numeric", maxlength: 17, value: s.isbn ? formatIsbn(s.isbn) : "", placeholder: "978-…" }) : null;
   const kind = cat?.setable || quick
     ? h("select", null, (quick ? [["konvolut", "Konvolut (gemischter Inhalt)"], ["set", "Set"]]
@@ -474,6 +538,22 @@ async function viewDetails(main) {
     h("button", { type: "button", role: "radio", "aria-checked": String(mode === v), class: mode === v ? "an" : "", onclick: () => { mode = v; store.set("analyse", v); renderSeg(); } }, l)));
   renderSeg();
   const err = h("p", { class: "fehler", hidden: true });
+
+  if (isbn) {
+    if (s.bib) showBib(s.bib);
+    else if (s.isbn) lookupBib(s.isbn).then((b) => { s.bib = b; showBib(b); });
+    // Von Hand eingegebene ISBN nachschlagen, sobald sie vollständig ist.
+    isbn.addEventListener("input", async () => {
+      const v = isbn.value.replace(/[^0-9Xx]/g, "");
+      if (!(v.length === 10 || isIsbn13(v))) { fill(bibBox); return; }
+      fill(bibBox, h("p", { class: "muted" }, "Suche Buchdaten …"));
+      const b = await lookupBib(v);
+      if (isbn.value.replace(/[^0-9Xx]/g, "") !== v) return;
+      if (b === null) fill(bibBox, h("p", { class: "muted" }, "Nicht im Katalog gefunden."));
+      else if (b === undefined) fill(bibBox, h("p", { class: "muted" }, "Katalog gerade nicht erreichbar – wird beim Hochladen ergänzt."));
+      else showBib(b);
+    });
+  }
 
   async function save(next) {
     const isbnVal = isbn?.value.replace(/[^0-9Xx]/g, "") || null;
@@ -521,6 +601,7 @@ async function viewDetails(main) {
     h("form", { class: "form", onsubmit: (e) => { e.preventDefault(); save(true); } },
       h("label", null, "Kurzbezeichnung ", h("span", { class: "muted" }, "(optional, Claude ergänzt)"), title),
       isbn ? h("label", null, "ISBN", isbn) : null,
+      bibBox,
       quickCat ? h("label", null, "Überwiegend", quickCat) : null,
       kind ? h("label", null, "Art", kind) : null,
       h("label", null, "Anzahl", qty),

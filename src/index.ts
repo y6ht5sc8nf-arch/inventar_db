@@ -6,8 +6,9 @@ import {
   createContainer, createRoom, deleteContainer, deleteRoom, listRooms, updateContainer, updateRoom,
 } from "./rooms";
 import { createItem, deleteItem, getPhoto, listItems, uploadPhoto } from "./items";
+import { enrichPending, lookupIsbn } from "./isbn";
 
-type Handler = (req: Request, env: Env, user: AccessUser, params: string[]) => Promise<Response>;
+type Handler = (req: Request, env: Env, user: AccessUser, params: string[], ctx: ExecutionContext) => Promise<Response>;
 
 const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/api\/health$/, async (_req, env) => health(env)],
@@ -22,9 +23,14 @@ const routes: [string, RegExp, Handler][] = [
   ["DELETE", /^\/api\/containers\/([^/]+)$/, (_r, env, _u, [id]) => deleteContainer(env, id)],
 
   ["GET", /^\/api\/items$/, (r, env) => listItems(r, env)],
-  ["POST", /^\/api\/items$/, (r, env, u) => createItem(r, env, u)],
+  ["POST", /^\/api\/items$/, (r, env, u, _p, ctx) => createItem(r, env, u, ctx)],
   ["DELETE", /^\/api\/items\/([^/]+)$/, (_r, env, _u, [id]) => deleteItem(env, id)],
   ["POST", /^\/api\/items\/([^/]+)\/photos$/, (r, env, _u, [id]) => uploadPhoto(r, env, id)],
+  ["GET", /^\/api\/isbn\/([0-9Xx-]{10,17})$/, async (_r, env, _u, [isbn]) => {
+    const r = await lookupIsbn(env, isbn);
+    if (!r) throw new HttpError(400, "Keine gültige ISBN");
+    return json(r);
+  }],
   ["GET", /^\/api\/photos\/([^/]+)\/(thumb|full)$/, (r, env, _u, [id, size]) => getPhoto(r, env, id, size)],
 ];
 
@@ -48,7 +54,7 @@ async function health(env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return serveStatic(request);
 
@@ -67,7 +73,7 @@ export default {
       pathMatched = true;
       if (method !== request.method) continue;
       try {
-        return await handler(request, env, user, m.slice(1).map(decodeURIComponent));
+        return await handler(request, env, user, m.slice(1).map(decodeURIComponent), ctx);
       } catch (e) {
         if (e instanceof HttpError) return json({ error: e.message }, e.status);
         console.error(e);
@@ -77,7 +83,9 @@ export default {
     return json({ error: pathMatched ? "Methode nicht erlaubt" : "Nicht gefunden" }, pathMatched ? 405 : 404);
   },
 
-  async scheduled(): Promise<void> {
+  async scheduled(_event, env, ctx): Promise<void> {
+    // Bücher mit ISBN, aber noch ohne Katalogdaten (z. B. offline erfasst) nachträglich ergänzen.
+    ctx.waitUntil(enrichPending(env).catch((e) => console.error("ISBN-Nachtrag", e)));
     // Phase 3: offene Message Batches abfragen und Ergebnisse übernehmen.
   },
 } satisfies ExportedHandler<Env>;

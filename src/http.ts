@@ -44,7 +44,7 @@ export function text(v: unknown, field: string, max: number, required = false): 
     return null;
   }
   if (typeof v !== "string") throw new HttpError(400, `${field} muss Text sein`);
-  const s = v.trim();
+  const s = v.normalize("NFC").trim();
   if (s.length > max) throw new HttpError(400, `${field} ist zu lang`);
   if (required && !s) throw new HttpError(400, `${field} fehlt`);
   return s || null;

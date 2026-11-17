@@ -33,8 +33,8 @@ const out = (n) => `${__dirname}/${n}.png`;
   await page.getByRole("button", { name: /^Buch/ }).click();
   await page.locator(".cam-video").waitFor();
   await page.getByText("Jetzt: Einband vorne (Pflicht)").waitFor();
-  await page.locator(".isbn-chip.ok").waitFor({ timeout: 20000 });
-  step("ISBN erkannt: " + (await page.locator(".isbn-chip").textContent()));
+  await page.locator(".isbn-chip", { hasText: "Goethe: Faust" }).waitFor({ timeout: 20000 });
+  step("ISBN erkannt, Buchdaten: " + (await page.locator(".isbn-chip").textContent()));
   for (let i = 0; i < 4; i++) {
     await page.locator(".shutter").click();
     await page.waitForTimeout(400);
@@ -52,6 +52,10 @@ const out = (n) => `${__dirname}/${n}.png`;
   // Angaben
   const isbnVal = await page.getByLabel("ISBN").inputValue();
   step("ISBN im Formular: " + isbnVal);
+  const prefilled = await page.getByLabel(/Kurzbezeichnung/).inputValue();
+  step("Titel vorbelegt: " + prefilled);
+  await page.locator(".card.bib", { hasText: "Reclam" }).waitFor();
+  step("Buchdaten-Karte: " + (await page.locator(".card.bib dl").innerText()).replace(/\n/g, " | "));
   await page.getByLabel(/Kurzbezeichnung/).fill("Testbuch");
   await page.screenshot({ path: out("4-angaben"), fullPage: true });
   await page.getByRole("button", { name: "Speichern & fertig" }).click();
